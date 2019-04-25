@@ -4,9 +4,9 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.event.KeyEvent;
-import java.util.ArrayList;
 import java.util.HashSet;
 
+import me.ipodtouch0218.java2dengine.GameEngine;
 import me.ipodtouch0218.java2dengine.input.InputHandler;
 import me.ipodtouch0218.java2dengine.object.GameObject;
 import me.ipodtouch0218.panels.BlockType;
@@ -14,51 +14,100 @@ import me.ipodtouch0218.panels.util.MiscUtils;
 
 public class ObjPonBoard extends GameObject {
 
-	private static final int blockScale = 32;
+	public static final int blockScale = 32;
 	private static final int matchMinSize = 3;
 
-	private BlockType[][] blocks = new BlockType[6][13];
-	private double[] rowGravityTimer = new double[6];
+	private int width = 6, height = 12;
 	
-	private double boardScroll = 0;
+	BlockType[][] blocks;
+	double[] rowGravityTimer;
+	
+	double boardScroll = 0;
 	private double scrollSpeed = 0.1; //measured in blocks per second
-	private boolean scroll = true;
-	private boolean manualScrolling = false;
+	private boolean scroll = true, manualScrolling = false, matching = false;
+	private double scrollDelay = 0;
 	
-	private int cursorX = 2;
-	private int cursorY = 5;
+	private int cursorX = (width/2)-1;
+	private int cursorY = height/2;
+	
+	private boolean swapping;
+	private double swappingTimer;
 	
 	private boolean leftPressed, rightPressed, upPressed, downPressed, rotPressed, scrollPressed;
 	
-	public ObjPonBoard() {
+	public ObjPonBoard(int width, int height) {
+		this.width = width;
+		this.height = height;
+		
+		blocks = new BlockType[width][height+1];
+		rowGravityTimer = new double[width];
+		
+		cursorX = (width/2)-1;
+		cursorY = height/2;
 		
 		//TODO: generate board without matches
 		
-		for (int x = 0; x < blocks.length; x++) {
-			for (int y = blocks[x].length - 1; y > 6; y--) {
-				blocks[x][y] = BlockType.randomBlock();
-			}
-		}
+		fillBoard();
+		
 		
 	}
 	
-	private void prefillBoard() {
-		//Boards start with 30 tiles, none matching, 
+	private void fillBoard() {
+		//fill lowest 6
+		for (int x = 0; x < width; x++) {
+			blocks[x][height] = BlockType.randomBlock();
+		}
+		
+		//Boards start with 30 tiles, none touching
+		for (int count = 0; count < 30; count++) {
+			
+			int x = 0, y = 0;
+			while (y > (height/2)) {
+				x = (int) (Math.random()*blocks.length);
+				y = getTopBlockPos(x)-1;
+			}
+			BlockType random = null;
+			while (true) {
+				random = BlockType.randomBlock();
+				
+				if (y < height-1 && blocks[x][y+1] == random) { continue; } //matches block below
+				if (x > 0 && blocks[x-1][y] == random) { continue; } //matches block on the left
+				if (x < width-1 && blocks[x+1][y] == random) { continue; } //matches block on the right
+				break;
+			}
+			blocks[x][y] = random;
+		}
 	}
 	
 	////
 	
 	@Override
 	public void tick(double delta) {
-
+		handleSwapping(delta);
 		handleControls();
 		handleScrolling(delta);
 		handleGravity(delta);
-		
 	}
 	
+	private void handleSwapping(double delta) {
+		if (!swapping) { return; }
+		swappingTimer -= delta;
+		if (swappingTimer < 0) {
+			BlockType temp = blocks[cursorX][cursorY];
+			blocks[cursorX][cursorY] = blocks[cursorX + 1][cursorY];
+			blocks[cursorX + 1][cursorY] = temp;
+			
+			findAndClearMatches(cursorX, cursorY);
+			findAndClearMatches(cursorX+1, cursorY);
+			swapping = false;
+		}
+	}
+	
+	
+		
 	private void handleControls() {
 		if (manualScrolling) { return; }
+		if (swapping) { return; }
 		boolean pressed = false, moved = false;
 		
 		pressed = InputHandler.isKeyPressed(KeyEvent.VK_LEFT);
@@ -90,13 +139,13 @@ public class ObjPonBoard extends GameObject {
 		downPressed = pressed;
 		
 		pressed = InputHandler.isKeyPressed(KeyEvent.VK_ENTER);
-		if (pressed && !scrollPressed) {
+		if (pressed && !scrollPressed && scrollDelay <= 0) {
 			manualScrolling = true;
 		}
 		scrollPressed = pressed;
 		
 		cursorX = MiscUtils.limit(cursorX, 0, 4);
-		cursorY = MiscUtils.limit(cursorY, 1, 11);
+		cursorY = MiscUtils.limit(cursorY, (blocksAtTop() ? 0 : 1), 11);
 		
 		pressed = InputHandler.isKeyPressed(KeyEvent.VK_A);
 		if (pressed && !rotPressed && !moved) {
@@ -107,46 +156,75 @@ public class ObjPonBoard extends GameObject {
 	
 	private void handleGravity(double delta) {
 		for (int i = 0; i < rowGravityTimer.length; i++) {
+			boolean timerstarted = false;
 			if (rowGravityTimer[i] > 0) {
 				rowGravityTimer[i] -= delta;
+				timerstarted = true;
+			} else {
+				int startingY = checkForGravity(i);
+				if (startingY != -1) {
+					rowGravityTimer[i] = 0.1;
+				}
+			}
+			
+			//start blocks falling
+			if (rowGravityTimer[i] < 0 && timerstarted) {
+				GameEngine.addGameObject(new ObjFallingBlocks(this, i, checkForGravity(i)));
 			}
 		}
 	}
 	
+	private int checkForGravity(int x) {
+		for (int y = blocks[x].length-2; y >= 0; y--) {
+			if (blocks[x][y] != null && blocks[x][y+1] == null) {
+				//this block needs to fall
+				return y;
+			}
+		}
+		return -1;
+	}
+	
+	
 	private void swapBlocks() {
-		if ((rowGravityTimer[cursorX] > 0 && blocks[cursorX][cursorY+1] == null) ||
-			(rowGravityTimer[cursorX+1] > 0 && blocks[cursorX+1][cursorY+1] == null)) 
+		if (swapping) { return; }
+		if (blocks[cursorX][cursorY] == null && blocks[cursorX+1][cursorY] == null) { return; }
+		if ((rowGravityTimer[cursorX] != 0 && blocks[cursorX][cursorY+1] == null) ||
+			(rowGravityTimer[cursorX+1] != 0 && blocks[cursorX+1][cursorY+1] == null)) 
 				{ return; }
 		
-		BlockType temp = blocks[cursorX][cursorY];
-		blocks[cursorX][cursorY] = blocks[cursorX + 1][cursorY];
-		blocks[cursorX + 1][cursorY] = temp;
-		
-		findAndClearMatches(cursorX, cursorY);
-		findAndClearMatches(cursorX+1, cursorY);
+		swapping = true;
+		swappingTimer = 0.05;
 	}
 	
 	private void handleScrolling(double delta) {
+		if (matching) { return; }
+		if (scrollDelay > 0) { scrollDelay-=delta; return; }
 		if (!scroll && !manualScrolling) { return; }
 		if (blocksAtTop()) { 
 			manualScrolling = false;
 			return; 
 		}
 		
-		if (manualScrolling) {
-			boardScroll += 8*blockScale*delta;
-		} else {
-			boardScroll += scrollSpeed*blockScale*delta;
+		if (boardScroll < blockScale) {
+			if (manualScrolling) {
+				boardScroll += 8*blockScale*delta;
+			} else {
+				boardScroll += scrollSpeed*blockScale*delta;
+			}
 		}
 		if (boardScroll >= blockScale) {
-			moveBlocksUp();
-			boardScroll %= blockScale;
+			boolean resetscroll = moveBlocksUp();
+			if (resetscroll) {
+				boardScroll %= blockScale;
+			} else {
+				boardScroll = blockScale;
+			}
 			manualScrolling = false;
 		}
 	}
 	
-	private void moveBlocksUp() {
-		if (blocksAtTop()) { return; }
+	private boolean moveBlocksUp() {
+		if (blocksAtTop()) { return false; }
 		
 		for (int xBlock = 0; xBlock < blocks.length; xBlock++) {
 			boolean moved = false;
@@ -169,6 +247,7 @@ public class ObjPonBoard extends GameObject {
 		}
 		
 		cursorY -= 1;
+		return true;
 	}
 	
 	
@@ -195,10 +274,11 @@ public class ObjPonBoard extends GameObject {
 	}
 	
 	private void renderBlocks(Graphics2D g) {
-		g.setClip((int) x, (int) y-2, blockScale*blocks.length, blockScale*(blocks[0].length-1)+2);
+		g.setClip((int) x-1, (int) y-2, blockScale*blocks.length+2, blockScale*(blocks[0].length-1)+2);
 		
 		for (int xBlock = 0; xBlock < blocks.length; xBlock++) {
 			for (int yBlock = blocks[xBlock].length - 1; yBlock >= 0; yBlock--) {
+				
 				
 				BlockType block = blocks[xBlock][yBlock];
 				if (block == null) { continue; }
@@ -208,7 +288,13 @@ public class ObjPonBoard extends GameObject {
 					g.setColor(block.color().darker().darker());
 				}
 				
-				g.fillRect((int) (x + (xBlock * blockScale) + 1), (int) (y + (yBlock * blockScale) - boardScroll + 1), blockScale-2, blockScale-2);
+				double swapOffset = 0;
+				if (swapping && yBlock == cursorY && ((xBlock == cursorX) || (xBlock == cursorX+1))) { 
+					swapOffset = ((1-(swappingTimer/0.05))*blockScale);
+					if (xBlock == cursorX+1) { swapOffset *= -1; }
+				}
+				
+				g.fillRect((int) (x + (xBlock * blockScale) + 1 + swapOffset), (int) (y + (yBlock * blockScale) - boardScroll + 1), blockScale-2, blockScale-2);
 			}
 		}
 	}
@@ -220,22 +306,15 @@ public class ObjPonBoard extends GameObject {
 	
 	////
 	
-	private void checkForGravity() {
-		for (int x = 0; x < blocks.length; x++) {
-			for (int y = 0; y < blocks.length; y++) {
-				
-			}
-		}
-	}
-	
-	////
-	
 	
 	//TODO: "swapper matches" to combine nearby matches (two 3 lengths = one 6 length)
-	private void findAndClearMatches(int x, int y) {
-		getMatches(x,y).forEach(p -> blocks[p.x][p.y] = null);
-		
-		checkForGravity();
+	public void findAndClearMatches(int x, int y) {
+		HashSet<Point> matches = getMatches(x,y);
+		if (matches.isEmpty()) { return; }
+		matches.forEach(p -> {
+			blocks[p.x][p.y] = null;
+		});
+		scrollDelay = (matches.size()-matchMinSize)+1;
 	}
 	
 	private HashSet<Point> getMatches(int x, int y) {
@@ -282,6 +361,17 @@ public class ObjPonBoard extends GameObject {
 			i++;
 		}
 		return matching;
+	}
+
+	/// 
+	
+	public int getTopBlockPos(int row) {
+		int exists = blocks[row].length-1;
+		for (int y = blocks[row].length - 1; y >=0; y--) {
+			if (blocks[row][y] == null) { break; }
+			exists = y;
+		}
+		return exists;
 	}
 	
 	

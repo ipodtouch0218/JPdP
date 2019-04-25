@@ -21,5 +21,9 @@ public enum BlockType {
 	}
 	
 	public Color color() { return color; }
+
+	public static BlockType randomBlock() {
+		return values()[(int) (Math.random()*6)];
+	}
 	
 }

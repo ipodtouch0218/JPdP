@@ -22,7 +22,7 @@ public class PanelsMain {
 		GameEngine.setMaxFPS(60);
 		GameEngine.start();
 		
-		GameEngine.addGameObject(new ObjPonBoard(), 32, 64);
+		GameEngine.addGameObject(new ObjPonBoard(6, 12), 32, 64);
 		
 	}
 	
