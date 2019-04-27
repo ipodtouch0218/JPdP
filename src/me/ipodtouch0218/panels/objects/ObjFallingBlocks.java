@@ -62,8 +62,11 @@ public class ObjFallingBlocks extends GameObject {
 	@Override
 	public void render(Graphics2D g) {
 		for (int i = 0; i < blocks.length; i++) {
-			g.setColor(blocks[i].color());
-			g.fillRect((int) (x+1), (int) (y - (i * ObjPonBoard.blockScale)), ObjPonBoard.blockScale-2, ObjPonBoard.blockScale-2);
+			
+//			g.setColor(blocks[i].color());
+//			g.fillRect((int) (x+1), (int) (y - (i * ObjPonBoard.blockScale)), ObjPonBoard.blockScale-2, ObjPonBoard.blockScale-2);
+			
+			g.drawImage(blocks[i].sprite().getImage(), (int) x, (int) (y - (i * ObjPonBoard.blockScale)), ObjPonBoard.blockScale, ObjPonBoard.blockScale, null);
 		}
 	}
 }

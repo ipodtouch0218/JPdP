@@ -1,5 +1,6 @@
 package me.ipodtouch0218.panels.objects;
 
+import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Point;
@@ -27,8 +28,8 @@ public class ObjPonBoard extends GameObject {
 	private boolean scroll = true, manualScrolling = false, matching = false;
 	private double scrollDelay = 0;
 	
-	private int cursorX = (width/2)-1;
-	private int cursorY = height/2;
+	private int cursorX;
+	private int cursorY;
 	
 	private boolean swapping;
 	private double swappingTimer;
@@ -53,17 +54,16 @@ public class ObjPonBoard extends GameObject {
 	}
 	
 	private void fillBoard() {
+		if (blocks == null) { blocks = new BlockType[width][height+1]; }
 		//fill lowest 6
-		for (int x = 0; x < width; x++) {
-			blocks[x][height] = BlockType.randomBlock();
-		}
+		addNewBlockRow();
 		
 		//Boards start with 30 tiles, none touching
 		for (int count = 0; count < 30; count++) {
 			
 			int x = 0, y = 0;
-			while (y > (height/2)) {
-				x = (int) (Math.random()*blocks.length);
+			while (y < (height/2)) {
+				x = (int) (Math.random()*width);
 				y = getTopBlockPos(x)-1;
 			}
 			BlockType random = null;
@@ -97,8 +97,12 @@ public class ObjPonBoard extends GameObject {
 			blocks[cursorX][cursorY] = blocks[cursorX + 1][cursorY];
 			blocks[cursorX + 1][cursorY] = temp;
 			
-			findAndClearMatches(cursorX, cursorY);
-			findAndClearMatches(cursorX+1, cursorY);
+			if (blocks[cursorX][cursorY+1] != null) {
+				findAndClearMatches(cursorX, cursorY);
+			}
+			if (blocks[cursorX+1][cursorY+1] != null) {
+				findAndClearMatches(cursorX+1, cursorY);
+			}
 			swapping = false;
 		}
 	}
@@ -253,7 +257,11 @@ public class ObjPonBoard extends GameObject {
 	
 	private void addNewBlockRow() {
 		for (int i = 0; i < blocks.length; i++) {
-			blocks[i][blocks[i].length-1] = BlockType.randomBlock();
+			BlockType type = BlockType.randomBlock();
+			while (i > 1 && blocks[i-1][height] == type) {
+				type = BlockType.randomBlock();
+			}
+			blocks[i][height] = type;
 			//TODO: make into a "next" queue list for multiplayer syncing.
 		}
 	}
@@ -273,20 +281,22 @@ public class ObjPonBoard extends GameObject {
 		renderCursor(g);
 	}
 	
+	private static final AlphaComposite GRAY_COMPOSITE = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.8f);
 	private void renderBlocks(Graphics2D g) {
 		g.setClip((int) x-1, (int) y-2, blockScale*blocks.length+2, blockScale*(blocks[0].length-1)+2);
 		
 		for (int xBlock = 0; xBlock < blocks.length; xBlock++) {
+			boolean shaking = blocks[xBlock][1] != null;
 			for (int yBlock = blocks[xBlock].length - 1; yBlock >= 0; yBlock--) {
 				
 				
 				BlockType block = blocks[xBlock][yBlock];
 				if (block == null) { continue; }
 				
-				g.setColor(block.color());
-				if (yBlock >= blocks[xBlock].length - 1) {
-					g.setColor(block.color().darker().darker());
-				}
+//				g.setColor(block.color());
+//				if (yBlock >= height) {
+//					g.setColor(block.color().darker().darker());
+//				}
 				
 				double swapOffset = 0;
 				if (swapping && yBlock == cursorY && ((xBlock == cursorX) || (xBlock == cursorX+1))) { 
@@ -294,7 +304,21 @@ public class ObjPonBoard extends GameObject {
 					if (xBlock == cursorX+1) { swapOffset *= -1; }
 				}
 				
-				g.fillRect((int) (x + (xBlock * blockScale) + 1 + swapOffset), (int) (y + (yBlock * blockScale) - boardScroll + 1), blockScale-2, blockScale-2);
+				double shakeOffset = 0;
+				if (shaking) { shakeOffset = (Math.random()*4d)-2; }
+				
+				int xpos = (int) (x + (xBlock * blockScale) + swapOffset + shakeOffset);
+				int ypos = (int) (y + (yBlock * blockScale) - boardScroll);
+				
+//				g.fillRect((int) (x + (xBlock * blockScale) + 1 + swapOffset + shakeOffset), (int) (y + (yBlock * blockScale) - boardScroll + 1), blockScale-2, blockScale-2);
+				
+				g.setComposite(AlphaComposite.SrcOver);
+				g.drawImage(block.sprite().getImage(), xpos, ypos, blockScale, blockScale, null);
+				if (yBlock >= height) {
+					g.setComposite(GRAY_COMPOSITE);
+					g.setColor(Color.black);
+					g.fillRect(xpos, ypos, blockScale, blockScale);
+				}
 			}
 		}
 	}

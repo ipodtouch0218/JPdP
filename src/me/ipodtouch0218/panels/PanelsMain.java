@@ -16,13 +16,14 @@ public class PanelsMain {
 	}
 	
 	private void init() {
-		GameWindow.setWindowName("Panel de Pon");
-		GameWindow.setWindowSize(1280,720);
-//		GameWindow.setScaleSize(2, 2);
+		GameWindow.setWindowName("JPdP");
+		GameWindow.setWindowSize(256,448);
+		GameWindow.setScaleSize(1, 1);
 		GameEngine.setMaxFPS(60);
 		GameEngine.start();
+		GameWindow.center();
 		
-		GameEngine.addGameObject(new ObjPonBoard(6, 12), 32, 64);
+		GameEngine.addGameObject(new ObjPonBoard(6, 12), 32, 32);
 		
 	}
 	
