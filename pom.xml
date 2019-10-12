@@ -15,7 +15,7 @@
   	<dependency>
 	  <groupId>com.github.ipodtouch0218</groupId>
 	  <artifactId>Java2DEngine</artifactId>
-	  <version>4dc670134d</version>
+	  <version>3081dfe021</version>
 	</dependency>
   </dependencies>
   
