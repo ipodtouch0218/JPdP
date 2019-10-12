@@ -63,8 +63,6 @@ public class ObjPonBoard extends GameObject {
 		manualScrolling = false;
 		matching = false;
 		increaseSpeed = true;
-		rowChain = null;
-		rowGravityTimer = null;
 		
 		//TODO: generate board without matches
 		
