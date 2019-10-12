@@ -6,6 +6,8 @@ import me.ipodtouch0218.panels.objects.ObjPonBoard;
 
 public class PanelsMain {
 
+	public static boolean renderColor = false;
+	
 	public static void main(String[] args) {
 		new PanelsMain();
 	}
